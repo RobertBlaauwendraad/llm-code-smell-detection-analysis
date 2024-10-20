@@ -21,7 +21,7 @@ class Main:
         )
 
     def analyze_code_smells(self, path, limit=None):
-        data_list = get_data_list(path)
+        data_list = get_data_list(path, severity_filter="critical")
         return self.analyzer.get_code_smells(data_list, limit=limit)
 
     def get_openai_response(self, snippet):
@@ -60,5 +60,5 @@ class Main:
 
 if __name__ == '__main__':
     main = Main()
-    code_smells_responses = main.run("data/MLCQCodeSmellSamples.csv", limit=1)
+    code_smells_responses = main.run("data/MLCQCodeSmellSamples.csv", limit=5)
     print(code_smells_responses)

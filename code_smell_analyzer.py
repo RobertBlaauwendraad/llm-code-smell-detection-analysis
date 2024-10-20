@@ -1,9 +1,18 @@
 import csv
 
-def get_data_list(path):
+def get_data_list(path, smell_filter=None, severity_filter=None):
     with open(path, 'r') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
-        return [row for row in reader]
+        data_list = []
+
+        for row in reader:
+            if smell_filter and row["smell"] != smell_filter:
+                continue
+            if severity_filter and row["severity"] != severity_filter:
+                continue
+            data_list.append(row)
+
+        return data_list
 
 def get_snippet(file_content, start_line, end_line):
     lines = file_content.split("\n")
