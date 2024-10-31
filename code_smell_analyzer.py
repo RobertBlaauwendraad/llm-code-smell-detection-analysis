@@ -1,5 +1,7 @@
 import csv
 
+DEVELOP_IDS = {15187, 15309, 14409, 14989, 14893, 14956, 14902, 14666, 14852, 15226, 15029, 15311, 15341, 15170, 14876, 14576}
+
 def get_data_list(path, smell_filter=None, severity_filter=None):
     with open(path, 'r') as csvfile:
         reader = csv.DictReader(csvfile, delimiter=';')
@@ -11,6 +13,21 @@ def get_data_list(path, smell_filter=None, severity_filter=None):
             if severity_filter and row["severity"] != severity_filter:
                 continue
             data_list.append(row)
+
+        return data_list
+
+def get_data_list_develop(path, smell_filter=None, severity_filter=None):
+    with open (path, 'r') as csvfile:
+        reader = csv.DictReader(csvfile, delimiter=';')
+        data_list = []
+
+        for row in reader:
+            if smell_filter and row["smell"] != smell_filter:
+                continue
+            if severity_filter and row["severity"] != severity_filter:
+                continue
+            if int(row["id"]) in DEVELOP_IDS:
+                data_list.append(row)
 
         return data_list
 
