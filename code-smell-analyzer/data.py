@@ -18,6 +18,17 @@ class CodeSample:
         ''', (self.id, self.repository, self.commit_hash, self.path, self.start_line, self.end_line, self.link))
         conn.commit()
 
+    @staticmethod
+    def get_by_id(conn, sample_id):
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM CodeSample WHERE id = ?
+        ''', (sample_id,))
+        result = cursor.fetchone()
+        if result:
+            return CodeSample(result[0], result[1], result[2], result[3], result[4], result[5], result[6])
+        return None
+
     def __str__(self):
         return f'{self.repository} {self.commit_hash} {self.path} {self.start_line} {self.end_line}'
 
@@ -44,6 +55,19 @@ class CodeScope:
             return True
         return False
 
+    @staticmethod
+    def get_by_id_and_type(conn, sample_id, scope_type):
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?
+        ''', (sample_id, scope_type))
+        result = cursor.fetchone()
+        if result:
+            code_scope = CodeScope(result[1], result[2], result[3])
+            code_scope.id = result[0]
+            return code_scope
+        return None
+
     def __str__(self):
         return f'{self.sample_id} {self.scope_type}'
 
@@ -63,6 +87,18 @@ class CodeSmell:
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (self.id, self.code_sample_id, self.smell_type, self.severity, self.reviewer_id, self.review_timestamp))
         conn.commit()
+
+    @staticmethod
+    def get_smells_by_range(conn, start, end):
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM CodeSmell WHERE id BETWEEN ? AND ?
+        ''', (start, end))
+        rows = cursor.fetchall()
+        smells = []
+        for row in rows:
+            smells.append(CodeSmell(row[0], row[1], row[2], row[3], row[4], row[5]))
+        return smells
 
     def __str__(self):
         return f'{self.code_sample_id} {self.smell_type} {self.severity}'
