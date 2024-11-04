@@ -6,7 +6,7 @@ from config.config import Config
 from data.code_sample import CodeSample
 from data.code_scope import CodeScope
 from data.code_smell import CodeSmell
-from repository import Repository
+from repository.repository import Repository
 from services.openai_client import OpenAIClient
 
 

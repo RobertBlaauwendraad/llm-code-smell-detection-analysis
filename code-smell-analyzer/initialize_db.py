@@ -5,8 +5,7 @@ from data import initialize_database
 from data.code_sample import CodeSample
 from data.code_scope import CodeScope
 from data.code_smell import CodeSmell
-from repository import Repository
-
+from repository.repository import Repository
 
 def get_dataset():
     with open(Config.DATASET_PATH, 'r') as csvfile:
