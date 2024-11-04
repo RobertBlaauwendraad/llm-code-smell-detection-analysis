@@ -2,22 +2,16 @@ import sqlite3
 
 import pandas as pd
 
-from config.config import Config
 from data.code_sample import CodeSample
 from data.code_scope import CodeScope
 from data.code_smell import CodeSmell
-from repository.repository import Repository
 from services.openai_client import OpenAIClient
+from config.config import Config
 
-
-class Main:
+class SmellAnalyzer:
     def __init__(self):
-        self.repository = Repository()
-        self.conn = sqlite3.connect('../data/code_smell_analysis.db')
+        self.conn = sqlite3.connect(Config.DB_PATH)
         self.client = OpenAIClient()
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.conn.close()
 
     def analyze_function_smells(self, start_id, end_id):
         smells = CodeSmell.get_smells_by_range(self.conn, start_id, end_id)
@@ -65,9 +59,3 @@ class Main:
         print(correct_df)
         print('Incorrect')
         print(incorrect_df)
-
-
-if __name__ == '__main__':
-    main = Main()
-    results = main.analyze_function_smells(5394, 5433)
-    main.view_results(results)
