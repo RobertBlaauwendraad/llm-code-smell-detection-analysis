@@ -1,49 +1,21 @@
-import json
-import os
 import sqlite3
 
 import pandas as pd
-from dotenv import load_dotenv
-from openai import OpenAI
-from repository import Repository
-from data import CodeSample, CodeScope, CodeSmell
 
-FUNCTION_SMELL_ASSISTANT_ID = 'asst_q3U8t17fN67BBxZYmp68rHWo'
+from config.config import Config
+from data import CodeSample, CodeScope, CodeSmell
+from repository import Repository
+from services.openai_client import OpenAIClient
+
 
 class Main:
     def __init__(self):
-        load_dotenv()
-        self.openai_api_key = os.environ.get('OPENAI_API_KEY')
-        self.openai_organization = os.environ.get('OPENAI_ORGANIZATION')
-        self.openai_project = os.environ.get('OPENAI_PROJECT')
-        self.github_token = os.environ.get('GITHUB_TOKEN')
-        self.repository = Repository(self.github_token)
+        self.repository = Repository()
         self.conn = sqlite3.connect('../data/code_smell_analysis.db')
-        self.client = OpenAI(
-            api_key=self.openai_api_key,
-            organization=self.openai_organization,
-            project=self.openai_project,
-        )
+        self.client = OpenAIClient()
 
-    def get_openai_response(self, assistant_id, code_segment):
-        run = self.client.beta.threads.create_and_run(
-            assistant_id=assistant_id,
-            thread={
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": code_segment
-                    }
-                ]
-            },
-        )
-
-        while run.status != "completed":
-            run = self.client.beta.threads.runs.retrieve(thread_id=run.thread_id, run_id=run.id)
-
-        messages = self.client.beta.threads.messages.list(thread_id=run.thread_id)
-        response = messages.data[0].content[0].text.value
-        return json.loads(response)
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.conn.close()
 
     def analyze_function_smells(self, start_id, end_id):
         smells = CodeSmell.get_smells_by_range(self.conn, start_id, end_id)
@@ -57,7 +29,7 @@ class Main:
                 scopes[code_scope.id] = code_scope
 
         for scope_id, scope in scopes.items():
-            openai_response = self.get_openai_response(FUNCTION_SMELL_ASSISTANT_ID, scope.code_segment)
+            openai_response = self.client.get_response(Config.FUNCTION_SMELL_ASSISTANT_ID, scope.code_segment)
             for smell in smells:
                 if smell.code_sample_id == scope.sample_id:
                     if self.compare_results(smell, openai_response):
@@ -91,6 +63,7 @@ class Main:
         print(correct_df)
         print('Incorrect')
         print(incorrect_df)
+
 
 if __name__ == '__main__':
     main = Main()

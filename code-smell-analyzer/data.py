@@ -1,5 +1,6 @@
 import sqlite3
 
+
 class CodeSample:
     def __init__(self, sample_id, repository, commit_hash, path, start_line, end_line, link):
         self.id = sample_id
@@ -31,6 +32,7 @@ class CodeSample:
 
     def __str__(self):
         return f'{self.repository} {self.commit_hash} {self.path} {self.start_line} {self.end_line}'
+
 
 class CodeScope:
     def __init__(self, sample_id, scope_type, code_segment=None):
@@ -71,6 +73,7 @@ class CodeScope:
     def __str__(self):
         return f'{self.sample_id} {self.scope_type}'
 
+
 class CodeSmell:
     def __init__(self, smell_id, code_sample_id, smell_type, severity, reviewer_id, review_timestamp):
         self.id = smell_id
@@ -102,6 +105,7 @@ class CodeSmell:
 
     def __str__(self):
         return f'{self.code_sample_id} {self.smell_type} {self.severity}'
+
 
 def initialize_database():
     conn = sqlite3.connect('../data/code_smell_analysis.db')

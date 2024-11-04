@@ -1,23 +1,18 @@
 import csv
-from repository import Repository
-import os
-from dotenv import load_dotenv
 
+from config.config import Config
 from data import initialize_database, CodeSample, CodeScope, CodeSmell
-
-DATASET_PATH = '../data/MLCQCodeSmellSamples.csv'
+from repository import Repository
 
 
 def get_dataset():
-    with open(DATASET_PATH, 'r') as csvfile:
+    with open(Config.DATASET_PATH, 'r') as csvfile:
         return list(csv.DictReader(csvfile, delimiter=';'))
 
 
 class Initializer:
     def __init__(self):
-        load_dotenv()
-        self.github_token = os.environ.get('GITHUB_TOKEN')
-        self.gh_repository = Repository(self.github_token)
+        self.gh_repository = Repository()
         self.conn = initialize_database()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -50,5 +45,4 @@ class Initializer:
 
 if __name__ == '__main__':
     initializer = Initializer()
-    # initializer.populate_database(range(5394, 5436))
     initializer.populate_database()

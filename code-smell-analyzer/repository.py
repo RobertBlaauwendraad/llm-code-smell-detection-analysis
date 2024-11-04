@@ -1,10 +1,12 @@
 import github3
 from github3.exceptions import UnprocessableEntity, NotFoundError
 
+from config.config import Config
+
 
 class Repository:
-    def __init__(self, token):
-        self.gh = github3.login(token=token)
+    def __init__(self):
+        self.gh = github3.login(Config.GITHUB_TOKEN)
 
     def get_file_content(self, repository, commit_hash, path):
         try:
@@ -21,7 +23,7 @@ class Repository:
         if file_content is None:
             return None
         lines = file_content.split("\n")
-        return "\n".join(lines[start_line-1:end_line])
+        return "\n".join(lines[start_line - 1:end_line])
 
     def get_rate_limit(self):
         return self.gh.rate_limit()
