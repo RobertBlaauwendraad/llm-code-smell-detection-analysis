@@ -23,18 +23,12 @@ class BaseSmellAnalyzer:
     def count_results(self, openai_response, scope, smells):
         for smell in smells:
             if smell.code_sample_id == scope.sample_id:
-                if self.compare_results(smell, openai_response):
-                    if smell.smell_type not in self.results['correct']:
-                        self.results['correct'][smell.smell_type] = {}
-                    if smell.severity not in self.results['correct'][smell.smell_type]:
-                        self.results['correct'][smell.smell_type][smell.severity] = 0
-                    self.results['correct'][smell.smell_type][smell.severity] += 1
-                else:
-                    if smell.smell_type not in self.results['incorrect']:
-                        self.results['incorrect'][smell.smell_type] = {}
-                    if smell.severity not in self.results['incorrect'][smell.smell_type]:
-                        self.results['incorrect'][smell.smell_type][smell.severity] = 0
-                    self.results['incorrect'][smell.smell_type][smell.severity] += 1
+                result_type = 'correct' if self.compare_results(smell, openai_response) else 'incorrect'
+                if smell.smell_type not in self.results[result_type]:
+                    self.results[result_type][smell.smell_type] = {}
+                if smell.severity not in self.results[result_type][smell.smell_type]:
+                    self.results[result_type][smell.smell_type][smell.severity] = 0
+                self.results[result_type][smell.smell_type][smell.severity] += 1
 
     def view_results(self):
         correct_df = pd.DataFrame(self.results['correct']).fillna(0).astype(int)
