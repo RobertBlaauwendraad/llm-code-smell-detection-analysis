@@ -25,7 +25,7 @@ class CodeScope:
     def get_by_id_and_type(conn, sample_id, scope_type):
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?
+            SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ? AND code_segment IS NOT NULL
         ''', (sample_id, scope_type))
         result = cursor.fetchone()
         if result:
