@@ -1,7 +1,10 @@
 import csv
 
 from config.config import Config
-from data import initialize_database, CodeSample, CodeScope, CodeSmell
+from data import initialize_database
+from data.code_sample import CodeSample
+from data.code_scope import CodeScope
+from data.code_smell import CodeSmell
 from repository import Repository
 
 

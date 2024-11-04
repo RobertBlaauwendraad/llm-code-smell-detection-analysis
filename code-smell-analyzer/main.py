@@ -3,7 +3,9 @@ import sqlite3
 import pandas as pd
 
 from config.config import Config
-from data import CodeSample, CodeScope, CodeSmell
+from data.code_sample import CodeSample
+from data.code_scope import CodeScope
+from data.code_smell import CodeSmell
 from repository import Repository
 from services.openai_client import OpenAIClient
 
