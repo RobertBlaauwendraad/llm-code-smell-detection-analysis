@@ -24,8 +24,11 @@ class Initializer:
         cursor = self.conn.cursor()
         dataset = get_dataset()
         for data in dataset:
+            # Skip if id is not in the range
             if id_range and int(data['id']) not in id_range:
                 continue
+
+            # Skip if the CodeSample already exists
             if not cursor.execute(
                     '''SELECT * FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ? AND start_line = ? AND end_line = ?''',
                     (data['repository'], data['commit_hash'], data['path'], data['start_line'],
@@ -33,12 +36,14 @@ class Initializer:
                 CodeSample(data['sample_id'], data['repository'], data['commit_hash'], data['path'], data['start_line'],
                            data['end_line'], data['link']).save(self.conn)
 
+            # Skip if the CodeScope already exists
             if not cursor.execute('''SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?''',
                                   (data['sample_id'], data['type'])).fetchone():
                 code_segment = self.gh_repository.get_segment(data['repository'], data['commit_hash'], data['path'],
                                                               int(data['start_line']), int(data['end_line']))
                 CodeScope(data['sample_id'], data['type'], code_segment).save(self.conn)
 
+            # Skip if the CodeSmell already exists
             if not cursor.execute('''SELECT * FROM CodeSmell WHERE id = ?''',
                                   (data['id'],)).fetchone():
                 CodeSmell(data['id'], data['sample_id'], data['smell'], data['severity'], data['reviewer_id'],
