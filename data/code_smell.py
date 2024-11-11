@@ -39,5 +39,25 @@ class CodeSmell:
             smells.append(CodeSmell(row[0], row[1], row[2], row[3], row[4], row[5]))
         return smells
 
+    @staticmethod
+    def get_development_ids(conn, smell_type, severity, scope, limit=None):
+        cursor = conn.cursor()
+
+        query = '''
+            SELECT cs.id FROM CodeSmell cs
+            JOIN CodeScope sc ON cs.code_sample_id = sc.sample_id AND sc.scope_type = ?
+            WHERE cs.smell_type = ? AND cs.severity = ? AND sc.code_segment IS NOT NULL AND cs.code_sample_id IN (
+                SELECT code_sample_id FROM CodeSmell WHERE smell_type != ? AND severity = 'none'
+            )
+        '''
+        params = [scope, smell_type, severity, smell_type]
+        if limit:
+            query += ' LIMIT ?'
+            params.append(limit)
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        return [row[0] for row in rows]
+
     def __str__(self):
         return f'{self.code_sample_id} {self.smell_type} {self.severity}'
