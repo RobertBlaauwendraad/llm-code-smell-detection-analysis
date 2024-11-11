@@ -26,3 +26,7 @@ class FunctionSmellAnalyzer(BaseSmellAnalyzer):
     def view_results(self):
         print('Function Smell Results')
         super().view_results()
+
+    def view_scores(self):
+        print('Function Smell Scores')
+        super().view_scores()
