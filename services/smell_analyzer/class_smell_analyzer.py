@@ -9,8 +9,8 @@ class ClassSmellAnalyzer(BaseSmellAnalyzer):
     def __init__(self):
         super().__init__()
 
-    def analyze(self, start_id, end_id):
-        smells = CodeSmell.get_smells_by_range(self.conn, start_id, end_id)
+    def analyze(self, ids):
+        smells = CodeSmell.get_smells_by_ids(self.conn, ids)
         scopes = {}
 
         for smell in smells:

@@ -16,6 +16,18 @@ class CodeSmell:
         conn.commit()
 
     @staticmethod
+    def get_smells_by_ids(conn, ids):
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT * FROM CodeSmell WHERE id IN ({})
+        '''.format(','.join('?' * len(ids))), ids)
+        rows = cursor.fetchall()
+        smells = []
+        for row in rows:
+            smells.append(CodeSmell(row[0], row[1], row[2], row[3], row[4], row[5]))
+        return smells
+
+    @staticmethod
     def get_smells_by_range(conn, start, end):
         cursor = conn.cursor()
         cursor.execute('''
