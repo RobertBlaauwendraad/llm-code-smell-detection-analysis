@@ -52,4 +52,4 @@ class Initializer:
 
 if __name__ == '__main__':
     initializer = Initializer()
-    initializer.populate_database([5394, 5494])
+    initializer.populate_database()

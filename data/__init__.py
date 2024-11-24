@@ -2,7 +2,7 @@ import sqlite3
 
 
 def initialize_database():
-    conn = sqlite3.connect('../data/code_smell_analysis.db')
+    conn = sqlite3.connect('data/code_smell_analysis.db')
     cursor = conn.cursor()
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS CodeSample(

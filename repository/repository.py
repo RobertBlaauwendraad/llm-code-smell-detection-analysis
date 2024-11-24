@@ -6,7 +6,7 @@ from config.config import Config
 
 class Repository:
     def __init__(self):
-        self.gh = github3.login(Config.GITHUB_TOKEN)
+        self.gh = github3.login(token=Config.GITHUB_TOKEN)
 
     def get_file_content(self, repository, commit_hash, path):
         try:
