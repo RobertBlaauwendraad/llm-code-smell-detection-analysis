@@ -49,6 +49,14 @@ class Initializer:
                 CodeSmell(data['id'], data['sample_id'], data['smell'], data['severity'], data['reviewer_id'],
                           data['review_timestamp']).save(self.conn)
 
+            # Extend function scope to class scope
+            if data['type'] == 'function':
+                if not cursor.execute('''SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?''',
+                                      (data['sample_id'], 'class')).fetchone():
+                    extended_code_segment = self.gh_repository.get_extended_segment(data['repository'], data['commit_hash'], data['path'],
+                                                              int(data['start_line']), int(data['end_line']))
+                    CodeScope(data['sample_id'], 'class', extended_code_segment).save(self.conn)
+
 
 if __name__ == '__main__':
     initializer = Initializer()
