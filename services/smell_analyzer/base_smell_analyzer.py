@@ -14,6 +14,14 @@ class BaseSmellAnalyzer:
 
     @staticmethod
     def compare_results(code_smell, openai_response):
+        # If the code smell is not present, the response should not contain it
+        if code_smell.severity == 'none':
+            for smell in openai_response['smells']:
+                if code_smell.smell_type == smell['name']:
+                    return False
+            return True
+
+        # If the code smell is present, the response should contain it with the same severity
         for smell in openai_response['smells']:
             if code_smell.smell_type == smell['name']:
                 if code_smell.severity == smell['severity']:
