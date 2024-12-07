@@ -24,7 +24,7 @@ class CombinedSmellAnalyzer(BaseSmellAnalyzer):
                 scopes[code_scope.id] = code_scope
 
         for scope_id, scope in scopes.items():
-            openai_response = self.client.get_response(Config.CLASS_SMELL_ASSISTANT_ID, scope.code_segment)
+            openai_response = self.client.get_response(Config.COMBINED_SMELL_ASSISTANT_ID, scope.code_segment)
             self.count_results(openai_response, scope, smells)
 
     def get_develop_set(self):
