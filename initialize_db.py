@@ -55,7 +55,7 @@ class Initializer:
                                       (data['sample_id'], 'class')).fetchone():
                     extended_code_segment = self.gh_repository.get_extended_segment(data['repository'], data['commit_hash'], data['path'],
                                                               int(data['start_line']), int(data['end_line']))
-                    CodeScope(data['sample_id'], 'class', extended_code_segment).save(self.conn)
+                    CodeScope(data['sample_id'], 'extended_function', extended_code_segment).save(self.conn)
 
 
 if __name__ == '__main__':
