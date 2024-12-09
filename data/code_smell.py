@@ -1,9 +1,10 @@
 class CodeSmell:
-    def __init__(self, smell_id, code_sample_id, smell, severity, code_name, start_line, end_line, link):
+    def __init__(self, smell_id, code_sample_id, smell, severity, scope, code_name, start_line, end_line, link):
         self.id = smell_id
         self.code_sample_id = code_sample_id
         self.smell = smell
         self.severity = severity
+        self.scope = scope
         self.code_name = code_name
         self.start_line = start_line
         self.end_line = end_line
@@ -12,56 +13,41 @@ class CodeSmell:
     def save(self, conn):
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR IGNORE INTO CodeSmell(id, code_sample_id, smell, severity, code_name, start_line, end_line, link)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT OR IGNORE INTO CodeSmell(id, code_sample_id, smell, severity, scope, code_name, start_line, end_line, link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-        self.id, self.code_sample_id, self.smell, self.severity, self.code_name, self.start_line, self.end_line,
-        self.link))
+            self.id, self.code_sample_id, self.smell, self.severity, self.scope, self.code_name, self.start_line, self.end_line,
+            self.link))
         conn.commit()
 
+    def get_name(self):
+        # If code_name contains hashtag, return the first word after the hashtag
+        if '#' in self.code_name:
+            return self.code_name.split('#')[1].split(' ')[0]
+        else:
+            # Otherwise, return the first word after the last dot
+            return self.code_name.split('.')[-1].split(' ')[0]
+
     @staticmethod
-    def get_smells_by_ids(conn, ids):
+    def get_ids(conn, smell, severity, amount):
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM CodeSmell WHERE id IN ({})
-        '''.format(','.join('?' * len(ids))), ids)
+            SELECT id FROM CodeSmell WHERE smell = ? AND severity = ? LIMIT ?
+        ''', (smell, severity, amount))
         rows = cursor.fetchall()
-        smells = []
-        for row in rows:
-            smells.append(CodeSmell(row[0], row[1], row[2], row[3], row[4], row[5]))
-        return smells
+        return [row[0] for row in rows]
 
     @staticmethod
-    def get_smells_by_range(conn, start, end):
+    def get_code_sample_ids(conn, ids):
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT * FROM CodeSmell WHERE id BETWEEN ? AND ?
-        ''', (start, end))
-        rows = cursor.fetchall()
-        smells = []
-        for row in rows:
-            smells.append(CodeSmell(row[0], row[1], row[2], row[3], row[4], row[5]))
-        return smells
-
-    @staticmethod
-    def get_development_ids(conn, smell_type, severity, scope, limit=None):
-        cursor = conn.cursor()
-
         query = '''
-            SELECT cs.id FROM CodeSmell cs
-            JOIN CodeScope sc ON cs.code_sample_id = sc.sample_id AND sc.scope_type = ?
-            WHERE cs.smell_type = ? AND cs.severity = ? AND sc.code_segment IS NOT NULL AND cs.code_sample_id IN (
-                SELECT code_sample_id FROM CodeSmell WHERE smell_type != ? AND severity = 'none'
-            )
-        '''
-        params = [scope, smell_type, severity, smell_type]
-        if limit:
-            query += ' LIMIT ?'
-            params.append(limit)
-
-        cursor.execute(query, params)
+                    SELECT DISTINCT code_sample_id 
+                    FROM CodeSmell 
+                    WHERE id IN ({})
+                '''.format(','.join('?' * len(ids)))
+        cursor.execute(query, ids)
         rows = cursor.fetchall()
         return [row[0] for row in rows]
 
     def __str__(self):
-        return f'{self.code_sample_id} {self.smell_type} {self.severity}'
+        return f'{self.id} {self.smell} {self.severity} {self.code_name}'

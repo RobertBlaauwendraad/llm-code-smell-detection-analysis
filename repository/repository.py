@@ -20,14 +20,7 @@ class Repository:
         except (UnprocessableEntity, NotFoundError, AttributeError):
             return None
 
-    def get_segment(self, repository, commit_hash, path, start_line, end_line):
-        file_content = self.get_file_content(repository, commit_hash, path)
-        if file_content is None:
-            return None
-        lines = file_content.split("\n")
-        return "\n".join(lines[start_line - 1:end_line])
-
-    def get_extended_segment(self, repository, commit_hash, path, start_line):
+    def get_segment(self, repository, commit_hash, path, start_line):
         file_content = self.get_file_content(repository, commit_hash, path)
         if file_content is None:
             return None

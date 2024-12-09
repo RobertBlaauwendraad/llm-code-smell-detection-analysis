@@ -1,5 +1,7 @@
 import csv
 
+from github3.exceptions import ForbiddenError
+
 from config.config import Config
 from data import initialize_database
 from data.code_sample import CodeSample
@@ -21,37 +23,50 @@ class Initializer:
         self.conn.close()
 
     def populate_database(self, id_range=None):
-        cursor = self.conn.cursor()
-        dataset = get_dataset()
-        for entry in dataset:
-            # Skip if id is not in the range
-            if id_range and int(entry['id']) not in id_range:
-                continue
+        try:
+            cursor = self.conn.cursor()
+            dataset = get_dataset()
+            for entry in dataset:
+                # Skip if id is not in the range
+                if id_range and int(entry['id']) not in id_range:
+                    continue
 
-            code_segment = self.gh_repository.get_extended_segment(entry['repository'], entry['commit_hash'],
-                                                                   entry['path'],
-                                                                   int(entry['start_line']))
-            # Skip if code_segment is empty
-            if not code_segment:
-                continue
+                # Check if the CodeSample exists using repository, commit_hash, and path
+                cursor.execute(
+                    '''SELECT id FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ?''',
+                    (entry['repository'], entry['commit_hash'], entry['path']))
+                sample_id = cursor.fetchone()
 
-            # Save the CodeSample if it doesn't exist
-            cursor.execute(
-                '''SELECT id FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ? AND code_segment = ?''',
-                (entry['repository'], entry['commit_hash'], entry['path'], code_segment))
-            sample_id = cursor.fetchone()
-            if not sample_id:
-                sample_id = CodeSample(entry['sample_id'], entry['repository'], entry['commit_hash'], entry['path'],
-                                       code_segment).save(self.conn)
-            else:
-                sample_id = sample_id[0]
+                if not sample_id:
+                    # Get the code segment since it doesn't exist
+                    code_segment = self.gh_repository.get_segment(entry['repository'], entry['commit_hash'],
+                                                                  entry['path'],
+                                                                  int(entry['start_line']))
 
-            # Save the CodeScope if it doesn't exist
-            if not cursor.execute('''SELECT 1 FROM CodeSmell WHERE id = ?''', (entry['id'],)).fetchone():
-                CodeSmell(entry['id'], sample_id, entry['smell'], entry['severity'], entry['code_name'],
-                          entry['start_line'], entry['end_line'], entry['link']).save(self.conn)
+                    # Skip if code_segment is empty
+                    if not code_segment:
+                        continue
+
+                    # Save the new CodeSample
+                    sample_id = CodeSample(entry['sample_id'], entry['repository'], entry['commit_hash'], entry['path'],
+                                           code_segment).save(self.conn)
+                else:
+                    sample_id = sample_id[0]
+
+                # Save the CodeScope if it doesn't exist and sample_id is not None
+                if not cursor.execute('''SELECT 1 FROM CodeSmell WHERE id = ?''',
+                                      (entry['id'],)).fetchone() and sample_id:
+                    CodeSmell(entry['id'], sample_id, entry['smell'], entry['severity'], entry['type'],
+                              entry['code_name'],
+                              entry['start_line'], entry['end_line'], entry['link']).save(self.conn)
+        except ForbiddenError as e:
+            print(f'ForbiddenError: {e}')
+
+    def show_rate_limit(self):
+        print(self.gh_repository.get_rate_limit()['resources']['core'])
 
 
 if __name__ == '__main__':
     initializer = Initializer()
     initializer.populate_database()
+    initializer.show_rate_limit()

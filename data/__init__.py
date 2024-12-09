@@ -13,7 +13,7 @@ def initialize_database():
             commit_hash TEXT,
             path TEXT,
             code_segment TEXT,
-            UNIQUE(repository, commit_hash, path, code_segment)
+            UNIQUE(repository, commit_hash, path)
         )
     ''')
     cursor.execute('''
@@ -22,6 +22,7 @@ def initialize_database():
             code_sample_id INTEGER,
             smell TEXT,
             severity TEXT,
+            scope TEXT,
             code_name TEXT,
             start_line INTEGER,
             end_line INTEGER,
