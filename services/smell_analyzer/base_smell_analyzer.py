@@ -1,6 +1,9 @@
 import sqlite3
 
+import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from config.config import Config
 from services.openai_client import OpenAIClient
@@ -33,11 +36,17 @@ class BaseSmellAnalyzer:
         for smell in smells:
             if smell.code_sample_id == scope.sample_id:
                 if smell.smell_type not in self.results:
-                    self.results[smell.smell_type] = {'none': {'correct': 0, 'total': 0},
-                                                      'minor': {'correct': 0, 'total': 0},
-                                                      'major': {'correct': 0, 'total': 0},
-                                                      'critical': {'correct': 0, 'total': 0}}
+                    self.results[smell.smell_type] = {'none': {'correct': 0, 'total': 0, 'guesses': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}},
+                                                      'minor': {'correct': 0, 'total': 0, 'guesses': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}},
+                                                      'major': {'correct': 0, 'total': 0, 'guesses': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}},
+                                                      'critical': {'correct': 0, 'total': 0, 'guesses': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}}}
                 self.results[smell.smell_type][smell.severity]['total'] += 1
+                guessed_severity = 'none'
+                for smell_response in openai_response['smells']:
+                    if smell.smell_type == smell_response['name']:
+                        guessed_severity = smell_response['severity']
+                        break
+                self.results[smell.smell_type][smell.severity]['guesses'][guessed_severity] += 1
                 if self.compare_results(smell, openai_response):
                     self.results[smell.smell_type][smell.severity]['correct'] += 1
 
@@ -87,3 +96,115 @@ class BaseSmellAnalyzer:
 
         df = pd.DataFrame(metrics)
         print(df)
+
+    def weighted_kappa(self):
+        observed = np.zeros((4, 4))
+        expected = np.zeros((4, 4))
+        weights = np.zeros((4, 4))
+        severity_levels = ['none', 'minor', 'major', 'critical']
+
+        # Populate the observed matrix
+        for smell_type, severities in self.results.items():
+            for i, severity in enumerate(severity_levels):
+                for j, other_severity in enumerate(severity_levels):
+                    observed[i, j] += severities[severity]['guesses'][other_severity]
+
+        total = np.sum(observed)
+        if total == 0:
+            print("No data to calculate Weighted Kappa")
+            return
+
+        # Normalize observed matrix
+        observed = observed / total
+
+        # Calculate expected matrix
+        row_totals = np.sum(observed, axis=1)
+        col_totals = np.sum(observed, axis=0)
+        for i in range(4):
+            for j in range(4):
+                expected[i, j] = row_totals[i] * col_totals[j]
+
+        # Calculate weights matrix
+        for i in range(4):
+            for j in range(4):
+                weights[i, j] = 1 - ((i - j) ** 2 / (3 ** 2))  # Max difference is 3 (critical vs none)
+
+        # Calculate weighted kappa
+        weighted_observed = np.sum(weights * observed)
+        weighted_expected = np.sum(weights * expected)
+
+        kappa = (weighted_observed - weighted_expected) / (1 - weighted_expected) if (1 - weighted_expected) != 0 else 0
+
+        print("Observed Matrix:")
+        print(pd.DataFrame(observed, columns=severity_levels, index=severity_levels))
+        print("\nExpected Matrix:")
+        print(pd.DataFrame(expected, columns=severity_levels, index=severity_levels))
+        print("\nWeights Matrix:")
+        print(pd.DataFrame(weights, columns=severity_levels, index=severity_levels))
+        print(f'\nWeighted Kappa: {kappa:.4f}')
+
+        # Visualize the matrices using heatmaps
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5))
+        sns.heatmap(observed, annot=True, fmt=".2f", cmap="YlGnBu", ax=axes[0], xticklabels=severity_levels, yticklabels=severity_levels)
+        axes[0].set_title('Observed Matrix')
+        sns.heatmap(expected, annot=True, fmt=".2f", cmap="YlGnBu", ax=axes[1], xticklabels=severity_levels, yticklabels=severity_levels)
+        axes[1].set_title('Expected Matrix')
+        sns.heatmap(weights, annot=True, fmt=".2f", cmap="YlGnBu", ax=axes[2], xticklabels=severity_levels, yticklabels=severity_levels)
+        axes[2].set_title('Weights Matrix')
+
+        plt.tight_layout()
+        plt.show()
+
+        return kappa
+
+    def quadratic_weighted_kappa(self):
+        observed = np.zeros((4, 4))
+        severity_levels = ['none', 'minor', 'major', 'critical']
+
+        # Populate the observed matrix
+        for smell_type, severities in self.results.items():
+            for i, severity in enumerate(severity_levels):
+                for j, other_severity in enumerate(severity_levels):
+                    observed[i, j] += severities[severity]['guesses'][other_severity]
+
+        total = np.sum(observed)
+        if total == 0:
+            print("No data to calculate Quadratic Weighted Kappa")
+            return
+
+        # Normalize observed matrix
+        observed = observed / total
+
+        # Calculate weights matrix
+        weights = np.zeros((4, 4))
+        for i in range(4):
+            for j in range(4):
+                weights[i, j] = (i - j) ** 2
+
+        # Calculate quadratic weighted kappa
+        numerator = 0
+        denominator = 0
+        for i in range(4):
+            for j in range(4):
+                numerator += weights[i, j] * observed[i, j]
+                denominator += weights[i, j] * (i - j) ** 2
+
+        kappa = 1 - (numerator / denominator) if denominator != 0 else 0
+
+        print("Observed Matrix:")
+        print(pd.DataFrame(observed, columns=severity_levels, index=severity_levels))
+        print("\nWeights Matrix:")
+        print(pd.DataFrame(weights, columns=severity_levels, index=severity_levels))
+        print(f'\nQuadratic Weighted Kappa: {kappa:.4f}')
+
+        # Visualize the matrices using heatmaps
+        fig, axes = plt.subplots(1, 2, figsize=(12, 5))
+        sns.heatmap(observed, annot=True, fmt=".2f", cmap="YlGnBu", ax=axes[0], xticklabels=severity_levels, yticklabels=severity_levels)
+        axes[0].set_title('Observed Matrix')
+        sns.heatmap(weights, annot=True, fmt=".2f", cmap="YlGnBu", ax=axes[1], xticklabels=severity_levels, yticklabels=severity_levels)
+        axes[1].set_title('Weights Matrix')
+
+        plt.tight_layout()
+        plt.show()
+
+        return kappa
