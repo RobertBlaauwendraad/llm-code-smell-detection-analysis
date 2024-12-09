@@ -1,20 +1,19 @@
 class CodeSample:
-    def __init__(self, sample_id, repository, commit_hash, path, start_line, end_line, link):
+    def __init__(self, sample_id, repository, commit_hash, path, code_segment):
         self.id = sample_id
         self.repository = repository
         self.commit_hash = commit_hash
         self.path = path
-        self.start_line = start_line
-        self.end_line = end_line
-        self.link = link
+        self.code_segment = code_segment
 
     def save(self, conn):
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR IGNORE INTO CodeSample(id, repository, commit_hash, path, start_line, end_line, link)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (self.id, self.repository, self.commit_hash, self.path, self.start_line, self.end_line, self.link))
+            INSERT OR IGNORE INTO CodeSample(repository, commit_hash, path, code_segment)
+            VALUES (?, ?, ?, ?)
+        ''', (self.repository, self.commit_hash, self.path, self.code_segment))
         conn.commit()
+        return cursor.lastrowid
 
     @staticmethod
     def get_by_id(conn, sample_id):

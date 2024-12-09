@@ -11,5 +11,5 @@ class Config:
     FUNCTION_SMELL_ASSISTANT_ID = 'asst_q3U8t17fN67BBxZYmp68rHWo'
     CLASS_SMELL_ASSISTANT_ID = 'asst_Z6IHqM7ELNSaTryCMUDVbmOc'
     COMBINED_SMELL_ASSISTANT_ID = 'asst_ppm3BnfKxt5nDpKixqTdi7TN'
-    DB_PATH = './data/code_smell_analysis.db'
+    DB_PATH = './data/code_smell_detection_analysis.db'
     DATASET_PATH = './data/MLCQCodeSmellSamples.csv'

@@ -1,18 +1,22 @@
 class CodeSmell:
-    def __init__(self, smell_id, code_sample_id, smell_type, severity, reviewer_id, review_timestamp):
+    def __init__(self, smell_id, code_sample_id, smell, severity, code_name, start_line, end_line, link):
         self.id = smell_id
         self.code_sample_id = code_sample_id
-        self.smell_type = smell_type
+        self.smell = smell
         self.severity = severity
-        self.reviewer_id = reviewer_id
-        self.review_timestamp = review_timestamp
+        self.code_name = code_name
+        self.start_line = start_line
+        self.end_line = end_line
+        self.link = link
 
     def save(self, conn):
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT OR IGNORE INTO CodeSmell(id, code_sample_id, smell_type, severity, reviewer_id, review_timestamp)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (self.id, self.code_sample_id, self.smell_type, self.severity, self.reviewer_id, self.review_timestamp))
+            INSERT OR IGNORE INTO CodeSmell(id, code_sample_id, smell, severity, code_name, start_line, end_line, link)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+        self.id, self.code_sample_id, self.smell, self.severity, self.code_name, self.start_line, self.end_line,
+        self.link))
         conn.commit()
 
     @staticmethod
