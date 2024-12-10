@@ -75,11 +75,6 @@ class Initializer:
         except ForbiddenError as e:
             print(f'ForbiddenError: {e}')
 
-    def show_rate_limit(self):
-        print(self.gh_repository.get_rate_limit()['resources']['core'])
-
-
 if __name__ == '__main__':
     initializer = Initializer()
     initializer.populate_database()
-    initializer.show_rate_limit()
