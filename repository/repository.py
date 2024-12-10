@@ -1,7 +1,9 @@
+import base64
 import re
 
 import github3
-from github3.exceptions import UnprocessableEntity, NotFoundError
+import requests
+from requests import HTTPError
 
 from config.config import Config
 
@@ -12,12 +14,25 @@ class Repository:
 
     def get_file_content(self, repository, commit_hash, path):
         try:
-            repository = repository.replace("git@github.com:", "").replace(".git", "")
-            repo = self.gh.repository(*repository.split('/'))
-            commit = repo.commit(commit_hash)
-            file_content = repo.file_contents(path, ref=commit.sha)
-            return file_content.decoded.decode('utf-8')
-        except (UnprocessableEntity, NotFoundError, AttributeError):
+            # Construct the API URL
+            repo_owner, repo_name = repository.replace("git@github.com:", "").replace(".git", "").split('/')
+            url = f"https://api.github.com/repos/{repo_owner}/{repo_name}/contents/{path}"
+            headers = {"Authorization": f"token {Config.GITHUB_TOKEN}"}
+            params = {"ref": commit_hash}
+
+            # Make the single API call
+            response = requests.get(url, headers=headers, params=params)
+            response.raise_for_status()  # Raise an exception for HTTP errors
+
+            # Parse the response and decode the content
+            file_content = response.json()
+            content_base64 = file_content.get('content', None)
+            if content_base64 is None:
+                return None
+
+            # Decode the base64 content into bytes and then into a UTF-8 string
+            return base64.b64decode(content_base64).decode('utf-8')
+        except HTTPError:
             return None
 
     def get_segment(self, repository, commit_hash, path, start_line, end_line):
@@ -29,7 +44,7 @@ class Repository:
 
     def get_extended_segment(self, repository, commit_hash, path, start_line):
         file_content = self.get_file_content(repository, commit_hash, path)
-        if file_content is None:
+        if file_content is None or file_content == '':
             return None
         lines = file_content.split("\n")
 
