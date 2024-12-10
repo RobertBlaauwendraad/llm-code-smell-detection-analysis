@@ -3,11 +3,14 @@ import sqlite3
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import warnings
 
 from config.config import Config
 from data.code_sample import CodeSample
 from data.code_smell import CodeSmell
 from services.openai_client import OpenAIClient
+
+warnings.filterwarnings("ignore", message=".*tight_layout.*")
 
 SMELL_AMOUNTS = {
     'blob': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
@@ -87,11 +90,25 @@ class Analyzer:
         # Get distinct code sample ids
         code_sample_ids = CodeSmell.get_code_sample_ids(self.conn, ids)
         print(f'Code sample ids: {code_sample_ids}')
+        print(f'Number of code samples: {len(code_sample_ids)}')
+
+        # Calculate the total number of smells
+        total_smells = sum(
+            len(CodeSample.get_related_smells(self.conn, code_sample_id)) for code_sample_id in code_sample_ids)
+        print(f'Number of smells being evaluated: {total_smells}')
+
         for code_sample_id in code_sample_ids:
             self.process_code_sample(code_sample_id)
 
-        print(self.results)
         self.view_heatmaps()
+        self.binary_evaluation()
+
+    def get_ids(self):
+        ids = []
+        for smell, severity_amounts in SMELL_AMOUNTS.items():
+            for severity, amount in severity_amounts.items():
+                ids.extend(CodeSmell.get_ids(self.conn, smell, severity, amount))
+        return ids
 
     def process_code_sample(self, code_sample_id):
         # Get all related smells to the code sample
@@ -118,12 +135,48 @@ class Analyzer:
         if not smell_is_present:
             self.results[smell.smell][smell.severity]['guessed']['none'] += 1
 
-    def get_ids(self):
-        ids = []
-        for smell, severity_amounts in SMELL_AMOUNTS.items():
-            for severity, amount in severity_amounts.items():
-                ids.extend(CodeSmell.get_ids(self.conn, smell, severity, amount))
-        return ids
+    def binary_evaluation(self):
+        results_per_smell = {}
+        total_tp, total_fp, total_fn = 0, 0, 0
+
+        for smell, severity_results in self.results.items():
+            tp = 0  # True Positives, i.e. smells getting detected
+            fp = 0  # False Positives, i.e. smells getting detected when they are not present
+            fn = 0  # False Negatives, i.e. smells not getting detected when they are present
+
+            for severity, results in severity_results.items():
+                if severity == 'none':
+                    fp += sum(results['guessed'][s] for s in ['minor', 'major', 'critical'])
+                else:
+                    tp += sum(results['guessed'][s] for s in ['minor', 'major', 'critical'])
+                    fn += results['guessed']['none']
+
+            precision = tp / (tp + fp) if (tp + fp) > 0 else 0
+            recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+
+            results_per_smell[smell] = {
+                'precision': precision,
+                'recall': recall,
+                'f1_score': f1_score
+            }
+
+            total_tp += tp
+            total_fp += fp
+            total_fn += fn
+
+        total_precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
+        total_recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
+        total_f1_score = 2 * total_precision * total_recall / (total_precision + total_recall) if (
+                                                                                                          total_precision + total_recall) > 0 else 0
+
+        print("Per-Smell Metrics:")
+        for smell, metrics in results_per_smell.items():
+            print(
+                f"{smell}: Precision={metrics['precision']:.2f}, Recall={metrics['recall']:.2f}, F1 Score={metrics['f1_score']:.2f}")
+
+        print("\nTotal Metrics:")
+        print(f"Precision={total_precision:.2f}, Recall={total_recall:.2f}, F1 Score={total_f1_score:.2f}")
 
     def view_heatmaps(self):
         # Create a grid for all heatmaps in a 2x2 layout
@@ -190,6 +243,3 @@ class Analyzer:
 
         plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make space for the colorbars
         plt.show()
-
-    def binary_evaluation(self):
-        pass
