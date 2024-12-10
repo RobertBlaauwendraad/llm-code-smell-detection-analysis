@@ -6,16 +6,17 @@ from config.config import Config
 
 
 class OpenAIClient:
-    def __init__(self):
+    def __init__(self, assistant_id):
         self.client = OpenAI(
             api_key=Config.OPENAI_API_KEY,
             organization=Config.OPENAI_ORGANIZATION,
             project=Config.OPENAI_PROJECT,
         )
+        self.assistant_id = assistant_id
 
-    def get_response(self, assistant_id, code_segment):
+    def get_response(self, code_segment):
         run = self.client.beta.threads.create_and_run(
-            assistant_id=assistant_id,
+            assistant_id=self.assistant_id,
             thread={
                 "messages": [
                     {

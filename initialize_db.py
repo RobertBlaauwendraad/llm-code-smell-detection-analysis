@@ -1,11 +1,13 @@
 import csv
 
+from github3.exceptions import ForbiddenError
+
 from config.config import Config
 from data import initialize_database
 from data.code_sample import CodeSample
-from data.code_scope import CodeScope
 from data.code_smell import CodeSmell
 from repository.repository import Repository
+
 
 def get_dataset():
     with open(Config.DATASET_PATH, 'r') as csvfile:
@@ -21,42 +23,57 @@ class Initializer:
         self.conn.close()
 
     def populate_database(self, id_range=None):
-        cursor = self.conn.cursor()
-        dataset = get_dataset()
-        for data in dataset:
-            # Skip if id is not in the range
-            if id_range and int(data['id']) not in id_range:
-                continue
+        try:
+            cursor = self.conn.cursor()
+            dataset = get_dataset()
+            for entry in dataset:
+                # Skip if id is not in the range
+                if id_range and int(entry['id']) not in id_range:
+                    continue
 
-            # Skip if the CodeSample already exists
-            if not cursor.execute(
-                    '''SELECT * FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ? AND start_line = ? AND end_line = ?''',
-                    (data['repository'], data['commit_hash'], data['path'], data['start_line'],
-                     data['end_line'])).fetchone():
-                CodeSample(data['sample_id'], data['repository'], data['commit_hash'], data['path'], data['start_line'],
-                           data['end_line'], data['link']).save(self.conn)
+                # Check if the CodeSample exists using repository, commit_hash, and path
+                cursor.execute(
+                    '''SELECT id, code_segment FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ?''',
+                    (entry['repository'], entry['commit_hash'], entry['path']))
+                sample = cursor.fetchone()
 
-            # Skip if the CodeScope already exists
-            if not cursor.execute('''SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?''',
-                                  (data['sample_id'], data['type'])).fetchone():
-                code_segment = self.gh_repository.get_segment(data['repository'], data['commit_hash'], data['path'],
-                                                              int(data['start_line']), int(data['end_line']))
-                CodeScope(data['sample_id'], data['type'], code_segment).save(self.conn)
+                if not sample:
+                    print(f'Fetching code segment from {entry["link"]}')
 
-            # Skip if the CodeSmell already exists
-            if not cursor.execute('''SELECT * FROM CodeSmell WHERE id = ?''',
-                                  (data['id'],)).fetchone():
-                CodeSmell(data['id'], data['sample_id'], data['smell'], data['severity'], data['reviewer_id'],
-                          data['review_timestamp']).save(self.conn)
+                    # Get the code segment since it doesn't exist
+                    if entry['type'] == 'class':
+                        code_segment = self.gh_repository.get_segment(entry['repository'], entry['commit_hash'],
+                                                                      entry['path'], int(entry['start_line']),
+                                                                      int(entry['end_line']))
+                    else:
+                        code_segment = self.gh_repository.get_extended_segment(entry['repository'],
+                                                                               entry['commit_hash'],
+                                                                               entry['path'],
+                                                                               int(entry['start_line']))
 
-            # Extend function scope to class scope
-            if data['type'] == 'function':
-                if not cursor.execute('''SELECT * FROM CodeScope WHERE sample_id = ? AND scope_type = ?''',
-                                      (data['sample_id'], 'class')).fetchone():
-                    extended_code_segment = self.gh_repository.get_extended_segment(data['repository'], data['commit_hash'], data['path'],
-                                                              int(data['start_line']), int(data['end_line']))
-                    CodeScope(data['sample_id'], 'extended_function', extended_code_segment).save(self.conn)
+                    # Save the new CodeSample
+                    sample_id = CodeSample(entry['sample_id'], entry['repository'], entry['commit_hash'], entry['path'],
+                                           code_segment).save(self.conn)
+                    print(f'Saving CodeSample {sample_id}')
+                else:
+                    sample_id = sample[0]
+                    code_segment = sample[1]
+                    print(f'CodeSample already exists for {entry["repository"]} {entry["commit_hash"]} {entry["path"]}')
 
+                # Save the CodeScope if it doesn't exist and sample_id is not None
+                if not cursor.execute('''SELECT 1 FROM CodeSmell WHERE id = ?''',
+                                      (entry['id'],)).fetchone() and sample_id:
+                    if code_segment is None:
+                        print(f'Code segment is None for {entry["id"]}')
+                        CodeSmell(entry['id'], sample_id, None, None, None, None, None, None, None).save(self.conn)
+                    else:
+                        print(f'Saving CodeSmell {entry["id"]}')
+                        CodeSmell(entry['id'], sample_id, entry['smell'], entry['severity'], entry['type'],
+                                  entry['code_name'],
+                                  entry['start_line'], entry['end_line'], entry['link']).save(self.conn)
+
+        except ForbiddenError as e:
+            print(f'ForbiddenError: {e}')
 
 if __name__ == '__main__':
     initializer = Initializer()
