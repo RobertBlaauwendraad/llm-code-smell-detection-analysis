@@ -97,8 +97,8 @@ class Analyzer:
             len(CodeSample.get_related_smells(self.conn, code_sample_id)) for code_sample_id in code_sample_ids)
         print(f'Number of smells being evaluated: {total_smells}')
 
-        for code_sample_id in code_sample_ids:
-            self.process_code_sample(code_sample_id)
+        # for code_sample_id in code_sample_ids:
+        #     self.process_code_sample(code_sample_id)
 
         self.view_heatmaps()
         self.binary_evaluation()
@@ -137,46 +137,53 @@ class Analyzer:
 
     def binary_evaluation(self):
         results_per_smell = {}
-        total_tp, total_fp, total_fn = 0, 0, 0
+        total_tp, total_fp, total_fn, total_tn = 0, 0, 0, 0
 
         for smell, severity_results in self.results.items():
-            tp = 0  # True Positives, i.e. smells getting detected
+            tp = 0  # True Positives, i.e. smells correctly identified as present
             fp = 0  # False Positives, i.e. smells getting detected when they are not present
             fn = 0  # False Negatives, i.e. smells not getting detected when they are present
+            tn = 0  # True Negatives, i.e. smells correctly identified as not present
 
             for severity, results in severity_results.items():
                 if severity == 'none':
                     fp += sum(results['guessed'][s] for s in ['minor', 'major', 'critical'])
+                    tn += results['guessed']['none']
                 else:
                     tp += sum(results['guessed'][s] for s in ['minor', 'major', 'critical'])
                     fn += results['guessed']['none']
 
             precision = tp / (tp + fp) if (tp + fp) > 0 else 0
             recall = tp / (tp + fn) if (tp + fn) > 0 else 0
+            specificity = tn / (tn + fp) if (tn + fp) > 0 else 0
             f1_score = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
 
             results_per_smell[smell] = {
                 'precision': precision,
                 'recall': recall,
+                'specificity': specificity,
                 'f1_score': f1_score
             }
 
             total_tp += tp
             total_fp += fp
             total_fn += fn
+            total_tn += tn
 
         total_precision = total_tp / (total_tp + total_fp) if (total_tp + total_fp) > 0 else 0
         total_recall = total_tp / (total_tp + total_fn) if (total_tp + total_fn) > 0 else 0
+        total_specificity = total_tn / (total_tn + total_fp) if (total_tn + total_fp) > 0 else 0
         total_f1_score = 2 * total_precision * total_recall / (total_precision + total_recall) if (
                                                                                                           total_precision + total_recall) > 0 else 0
 
         print("Per-Smell Metrics:")
         for smell, metrics in results_per_smell.items():
             print(
-                f"{smell}: Precision={metrics['precision']:.2f}, Recall={metrics['recall']:.2f}, F1 Score={metrics['f1_score']:.2f}")
+                f"{smell}: Precision={metrics['precision']:.2f}, Recall={metrics['recall']:.2f}, Specificity={metrics['specificity']:.2f}, F1 Score={metrics['f1_score']:.2f}")
 
         print("\nTotal Metrics:")
-        print(f"Precision={total_precision:.2f}, Recall={total_recall:.2f}, F1 Score={total_f1_score:.2f}")
+        print(
+            f"Precision={total_precision:.2f}, Recall={total_recall:.2f}, Specificity={total_specificity:.2f}, F1 Score={total_f1_score:.2f}")
 
     def view_heatmaps(self):
         # Create a grid for all heatmaps in a 2x2 layout
