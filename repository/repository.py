@@ -1,7 +1,5 @@
 import base64
 import re
-
-import github3
 import requests
 from requests import HTTPError
 
@@ -9,9 +7,6 @@ from config.config import Config
 
 
 class Repository:
-    def __init__(self):
-        self.gh = github3.login(token=Config.GITHUB_TOKEN)
-
     def get_file_content(self, repository, commit_hash, path):
         try:
             # Construct the API URL
@@ -77,6 +72,3 @@ class Repository:
                 break
 
         return "\n".join(lines[class_start_line - 1:class_end_line])
-
-    def get_rate_limit(self):
-        return self.gh.rate_limit()

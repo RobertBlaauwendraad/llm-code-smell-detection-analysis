@@ -38,7 +38,7 @@ class Initializer:
                 sample = cursor.fetchone()
 
                 if not sample:
-                    print(f'Fetching code segment for {entry["repository"]} {entry["commit_hash"]} {entry["path"]}')
+                    print(f'Fetching code segment from {entry["link"]}')
 
                     # Get the code segment since it doesn't exist
                     if entry['type'] == 'class':
