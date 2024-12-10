@@ -11,3 +11,4 @@ class Config:
     ASSISTANT_ID = 'asst_8TPp3H5Gtjh8lVPZDE6T3QUc'
     DB_PATH = './data/code_smell_detection_analysis.db'
     DATASET_PATH = './data/MLCQCodeSmellSamples.csv'
+    RESULTS_FILE = './data/results.json'

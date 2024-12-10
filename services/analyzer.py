@@ -1,3 +1,5 @@
+import json
+import os
 import sqlite3
 
 import matplotlib.pyplot as plt
@@ -28,28 +30,9 @@ class Analyzer:
     def __init__(self):
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient(Config.ASSISTANT_ID)
+        self.results_file = Config.RESULTS_FILE
         self.results = {}
         self.initialize_results()
-        self.results = {'blob': {'none': {'total': 70, 'guessed': {'none': 43, 'minor': 8, 'major': 18, 'critical': 1}},
-                                 'minor': {'total': 13, 'guessed': {'none': 0, 'minor': 0, 'major': 13, 'critical': 0}},
-                                 'major': {'total': 9, 'guessed': {'none': 0, 'minor': 0, 'major': 9, 'critical': 0}},
-                                 'critical': {'total': 6,
-                                              'guessed': {'none': 0, 'minor': 0, 'major': 4, 'critical': 2}}},
-                        'data class': {
-                            'none': {'total': 72, 'guessed': {'none': 36, 'minor': 14, 'major': 22, 'critical': 0}},
-                            'minor': {'total': 12, 'guessed': {'none': 4, 'minor': 0, 'major': 8, 'critical': 0}},
-                            'major': {'total': 10, 'guessed': {'none': 1, 'minor': 0, 'major': 9, 'critical': 0}},
-                            'critical': {'total': 5, 'guessed': {'none': 1, 'minor': 0, 'major': 4, 'critical': 0}}},
-                        'long method': {
-                            'none': {'total': 52, 'guessed': {'none': 40, 'minor': 8, 'major': 4, 'critical': 0}},
-                            'minor': {'total': 14, 'guessed': {'none': 6, 'minor': 2, 'major': 6, 'critical': 0}},
-                            'major': {'total': 7, 'guessed': {'none': 2, 'minor': 0, 'major': 5, 'critical': 0}},
-                            'critical': {'total': 3, 'guessed': {'none': 2, 'minor': 0, 'major': 1, 'critical': 0}}},
-                        'feature envy': {
-                            'none': {'total': 58, 'guessed': {'none': 38, 'minor': 9, 'major': 11, 'critical': 0}},
-                            'minor': {'total': 8, 'guessed': {'none': 3, 'minor': 1, 'major': 4, 'critical': 0}},
-                            'major': {'total': 6, 'guessed': {'none': 5, 'minor': 0, 'major': 1, 'critical': 0}},
-                            'critical': {'total': 2, 'guessed': {'none': 2, 'minor': 0, 'major': 0, 'critical': 0}}}}
 
     def initialize_results(self):
         for smell in SMELLS:
@@ -58,7 +41,28 @@ class Analyzer:
                 self.results[smell][severity] = {'total': 0,
                                                  'guessed': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}}
 
-    def run(self, ids=None):
+    def save_results(self):
+        with open(self.results_file, "w") as file:
+            json.dump(self.results, file)
+        print(f"Results saved to {self.results_file}")
+
+    def load_results(self):
+        if os.path.exists(self.results_file):
+            with open(self.results_file, "r") as file:
+                self.results = json.load(file)
+            print(f"Results loaded from {self.results_file}")
+        else:
+            print(f"Results file {self.results_file} not found. Starting fresh.")
+            self.initialize_results()
+
+    def run(self, ids=None, use_cached=False):
+        if use_cached:
+            if os.path.exists(self.results_file):
+                self.load_results()
+                return
+            else:
+                print(f"Cached file {self.results_file} not found. Generating new results.")
+
         ids = self.get_ids() if ids is None else [ids]
 
         # Get distinct code sample ids
@@ -71,8 +75,10 @@ class Analyzer:
             len(CodeSample.get_related_smells(self.conn, code_sample_id)) for code_sample_id in code_sample_ids)
         print(f'Number of smells being evaluated: {total_smells}')
 
-        # for code_sample_id in code_sample_ids:
-        #     self.process_code_sample(code_sample_id)
+        for code_sample_id in code_sample_ids:
+            self.process_code_sample(code_sample_id)
+
+        self.save_results()
 
     def get_ids(self):
         ids = []
