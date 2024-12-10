@@ -1,6 +1,7 @@
 import sqlite3
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import seaborn as sns
 import warnings
@@ -19,13 +20,6 @@ SMELL_AMOUNTS = {
     'feature envy': {'none': 34, 'minor': 3, 'major': 2, 'critical': 1}
 }
 
-# SMELL_AMOUNTS = {
-#     'blob': {'none': 2, 'minor': 1, 'major': 1, 'critical': 1},
-#     'data class': {'none': 2, 'minor': 1, 'major': 1, 'critical': 1},
-#     'long method': {'none': 2, 'minor': 1, 'major': 1, 'critical': 1},
-#     'feature envy': {'none': 2, 'minor': 1, 'major': 1, 'critical': 1}
-# }
-
 SMELLS = ['blob', 'data class', 'long method', 'feature envy']
 SEVERITIES = ['none', 'minor', 'major', 'critical']
 
@@ -36,26 +30,6 @@ class Analyzer:
         self.openai_client = OpenAIClient(Config.ASSISTANT_ID)
         self.results = {}
         self.initialize_results()
-        # self.results = {'blob': {'none': {'total': 3, 'guessed': {'none': 1, 'minor': 0, 'major': 2, 'critical': 0}},
-        #                          'minor': {'total': 1, 'guessed': {'none': 0, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                          'major': {'total': 1, 'guessed': {'none': 0, 'minor': 0, 'major': 0, 'critical': 1}},
-        #                          'critical': {'total': 1,
-        #                                       'guessed': {'none': 0, 'minor': 0, 'major': 0, 'critical': 1}}},
-        #                 'data class': {
-        #                     'none': {'total': 3, 'guessed': {'none': 3, 'minor': 0, 'major': 0, 'critical': 0}},
-        #                     'minor': {'total': 1, 'guessed': {'none': 1, 'minor': 0, 'major': 0, 'critical': 0}},
-        #                     'major': {'total': 1, 'guessed': {'none': 0, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                     'critical': {'total': 1, 'guessed': {'none': 1, 'minor': 0, 'major': 0, 'critical': 0}}},
-        #                 'long method': {
-        #                     'none': {'total': 4, 'guessed': {'none': 3, 'minor': 1, 'major': 0, 'critical': 0}},
-        #                     'minor': {'total': 1, 'guessed': {'none': 0, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                     'major': {'total': 1, 'guessed': {'none': 0, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                     'critical': {'total': 1, 'guessed': {'none': 1, 'minor': 0, 'major': 0, 'critical': 0}}},
-        #                 'feature envy': {
-        #                     'none': {'total': 3, 'guessed': {'none': 2, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                     'minor': {'total': 1, 'guessed': {'none': 0, 'minor': 1, 'major': 0, 'critical': 0}},
-        #                     'major': {'total': 2, 'guessed': {'none': 1, 'minor': 0, 'major': 1, 'critical': 0}},
-        #                     'critical': {'total': 1, 'guessed': {'none': 1, 'minor': 0, 'major': 0, 'critical': 0}}}}
         self.results = {'blob': {'none': {'total': 70, 'guessed': {'none': 43, 'minor': 8, 'major': 18, 'critical': 1}},
                                  'minor': {'total': 13, 'guessed': {'none': 0, 'minor': 0, 'major': 13, 'critical': 0}},
                                  'major': {'total': 9, 'guessed': {'none': 0, 'minor': 0, 'major': 9, 'critical': 0}},
@@ -99,9 +73,6 @@ class Analyzer:
 
         # for code_sample_id in code_sample_ids:
         #     self.process_code_sample(code_sample_id)
-
-        self.view_heatmaps()
-        self.binary_evaluation()
 
     def get_ids(self):
         ids = []
@@ -176,14 +147,88 @@ class Analyzer:
         total_f1_score = 2 * total_precision * total_recall / (total_precision + total_recall) if (
                                                                                                           total_precision + total_recall) > 0 else 0
 
-        print("Per-Smell Metrics:")
+        print("\nBinary Classification Metrics:")
         for smell, metrics in results_per_smell.items():
             print(
                 f"{smell}: Precision={metrics['precision']:.2f}, Recall={metrics['recall']:.2f}, Specificity={metrics['specificity']:.2f}, F1 Score={metrics['f1_score']:.2f}")
 
-        print("\nTotal Metrics:")
         print(
-            f"Precision={total_precision:.2f}, Recall={total_recall:.2f}, Specificity={total_specificity:.2f}, F1 Score={total_f1_score:.2f}")
+            f"\nCombined: Precision={total_precision:.2f}, Recall={total_recall:.2f}, Specificity={total_specificity:.2f}, F1 Score={total_f1_score:.2f}")
+
+    def ordinal_evaluation(self):
+        """
+        Calculate and print Weighted Kappa for each smell type, including a combined QWK/WK.
+        """
+        print("\nWeighted Kappa Metrics:")
+        # Initialize combined results matrix
+        combined_results = {severity: {'total': 0, 'guessed': {sev: 0 for sev in SEVERITIES}} for severity in
+                            SEVERITIES}
+
+        # Aggregate results across all smells
+        for smell, severity_results in self.results.items():
+            for severity, results in severity_results.items():
+                combined_results[severity]['total'] += results['total']
+                for guessed, count in results['guessed'].items():
+                    combined_results[severity]['guessed'][guessed] += count
+
+        # Per-smell metrics
+        for smell, severity_results in self.results.items():
+            kappa_quadratic = self.weighted_kappa(severity_results, weights='quadratic')
+            kappa_linear = self.weighted_kappa(severity_results, weights='linear')
+            print(f"{smell}: Quadratic Weighted Kappa={kappa_quadratic:.2f}, Linear Weighted Kappa={kappa_linear:.2f}")
+
+        # Combined metrics
+        combined_kappa_quadratic = self.weighted_kappa(combined_results, weights='quadratic')
+        combined_kappa_linear = self.weighted_kappa(combined_results, weights='linear')
+        print(
+            f"\nCombined: Quadratic Weighted Kappa={combined_kappa_quadratic:.2f}, Linear Weighted Kappa={combined_kappa_linear:.2f}")
+
+    def weighted_kappa(self, severity_results, weights='linear'):
+        """
+        Calculate Weighted Kappa for a specific smell.
+
+        :param severity_results: A dictionary with 'total' and 'guessed' for each severity.
+        :param weights: 'linear' or 'quadratic' to determine weight matrix type.
+        :return: Weighted Kappa score.
+        """
+        n = len(SEVERITIES)
+
+        # Observed matrix
+        observed = np.zeros((n, n))
+        for i, actual in enumerate(SEVERITIES):
+            for j, guessed in enumerate(SEVERITIES):
+                observed[i, j] = severity_results[actual]['guessed'][guessed]
+
+        # Normalize observed matrix
+        total_observed = observed.sum()
+        observed /= total_observed
+
+        # Marginal probabilities
+        actual_totals = observed.sum(axis=1)
+        predicted_totals = observed.sum(axis=0)
+
+        # Expected matrix
+        expected = np.outer(actual_totals, predicted_totals)
+
+        # Weight matrix
+        weight_matrix = np.zeros((n, n))
+        for i in range(n):
+            for j in range(n):
+                diff = abs(i - j)
+                if weights == 'linear':
+                    weight_matrix[i, j] = diff
+                elif weights == 'quadratic':
+                    weight_matrix[i, j] = diff ** 2
+
+        # Normalize weight matrix
+        weight_matrix /= weight_matrix.max()
+
+        # Calculate weighted kappa
+        observed_disagreement = (observed * weight_matrix).sum()
+        expected_disagreement = (expected * weight_matrix).sum()
+        kappa = 1 - (observed_disagreement / expected_disagreement if expected_disagreement > 0 else 1)
+
+        return kappa
 
     def view_heatmaps(self):
         # Create a grid for all heatmaps in a 2x2 layout
