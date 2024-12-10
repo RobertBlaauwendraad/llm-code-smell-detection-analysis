@@ -33,32 +33,45 @@ class Initializer:
 
                 # Check if the CodeSample exists using repository, commit_hash, and path
                 cursor.execute(
-                    '''SELECT id FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ?''',
+                    '''SELECT id, code_segment FROM CodeSample WHERE repository = ? AND commit_hash = ? AND path = ?''',
                     (entry['repository'], entry['commit_hash'], entry['path']))
-                sample_id = cursor.fetchone()
+                sample = cursor.fetchone()
 
-                if not sample_id:
+                if not sample:
+                    print(f'Fetching code segment for {entry["repository"]} {entry["commit_hash"]} {entry["path"]}')
+
                     # Get the code segment since it doesn't exist
-                    code_segment = self.gh_repository.get_segment(entry['repository'], entry['commit_hash'],
-                                                                  entry['path'],
-                                                                  int(entry['start_line']))
-
-                    # Skip if code_segment is empty
-                    if not code_segment:
-                        continue
+                    if entry['type'] == 'class':
+                        code_segment = self.gh_repository.get_segment(entry['repository'], entry['commit_hash'],
+                                                                      entry['path'], int(entry['start_line']),
+                                                                      int(entry['end_line']))
+                    else:
+                        code_segment = self.gh_repository.get_extended_segment(entry['repository'],
+                                                                               entry['commit_hash'],
+                                                                               entry['path'],
+                                                                               int(entry['start_line']))
 
                     # Save the new CodeSample
                     sample_id = CodeSample(entry['sample_id'], entry['repository'], entry['commit_hash'], entry['path'],
                                            code_segment).save(self.conn)
+                    print(f'Saving CodeSample {sample_id}')
                 else:
-                    sample_id = sample_id[0]
+                    sample_id = sample[0]
+                    code_segment = sample[1]
+                    print(f'CodeSample already exists for {entry["repository"]} {entry["commit_hash"]} {entry["path"]}')
 
                 # Save the CodeScope if it doesn't exist and sample_id is not None
                 if not cursor.execute('''SELECT 1 FROM CodeSmell WHERE id = ?''',
                                       (entry['id'],)).fetchone() and sample_id:
-                    CodeSmell(entry['id'], sample_id, entry['smell'], entry['severity'], entry['type'],
-                              entry['code_name'],
-                              entry['start_line'], entry['end_line'], entry['link']).save(self.conn)
+                    if code_segment is None:
+                        print(f'Code segment is None for {entry["id"]}')
+                        CodeSmell(entry['id'], sample_id, None, None, None, None, None, None, None).save(self.conn)
+                    else:
+                        print(f'Saving CodeSmell {entry["id"]}')
+                        CodeSmell(entry['id'], sample_id, entry['smell'], entry['severity'], entry['type'],
+                                  entry['code_name'],
+                                  entry['start_line'], entry['end_line'], entry['link']).save(self.conn)
+
         except ForbiddenError as e:
             print(f'ForbiddenError: {e}')
 
