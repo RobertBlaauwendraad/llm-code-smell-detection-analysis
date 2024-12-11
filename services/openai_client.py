@@ -6,7 +6,7 @@ from config.config import Config
 
 
 class OpenAIClient:
-    def __init__(self, assistant_id):
+    def __init__(self, assistant_id=None):
         self.client = OpenAI(
             api_key=Config.OPENAI_API_KEY,
             organization=Config.OPENAI_ORGANIZATION,

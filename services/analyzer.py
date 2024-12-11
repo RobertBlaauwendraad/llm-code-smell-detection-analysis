@@ -15,11 +15,18 @@ from services.openai_client import OpenAIClient
 
 warnings.filterwarnings("ignore", message=".*tight_layout.*")
 
+# SMELL_AMOUNTS = {
+#     'blob': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
+#     'data class': {'none': 29, 'minor': 5, 'major': 4, 'critical': 2},
+#     'long method': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
+#     'feature envy': {'none': 34, 'minor': 3, 'major': 2, 'critical': 1}
+# }
+
 SMELL_AMOUNTS = {
-    'blob': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
-    'data class': {'none': 29, 'minor': 5, 'major': 4, 'critical': 2},
-    'long method': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
-    'feature envy': {'none': 34, 'minor': 3, 'major': 2, 'critical': 1}
+    'blob': {'none': 15, 'minor': 2, 'major': 2, 'critical': 1},
+    'data class': {'none': 14, 'minor': 3, 'major': 2, 'critical': 1},
+    'long method': {'none': 15, 'minor': 2, 'major': 2, 'critical': 1},
+    'feature envy': {'none': 17, 'minor': 1, 'major': 1, 'critical': 1}
 }
 
 SMELLS = ['blob', 'data class', 'long method', 'feature envy']
@@ -29,7 +36,7 @@ SEVERITIES = ['none', 'minor', 'major', 'critical']
 class Analyzer:
     def __init__(self):
         self.conn = sqlite3.connect(Config.DB_PATH)
-        self.openai_client = OpenAIClient(Config.ASSISTANT_ID)
+        self.openai_client = OpenAIClient()
         self.results_file = Config.RESULTS_FILE
         self.results = {}
         self.initialize_results()
@@ -58,15 +65,8 @@ class Analyzer:
             print(f"Results file {self.results_file} not found. Starting fresh.")
             self.initialize_results()
 
-    def run(self, ids=None, use_cached=False):
-        if use_cached:
-            if os.path.exists(self.results_file):
-                self.load_results()
-                return
-            else:
-                print(f"Cached file {self.results_file} not found. Generating new results.")
-
-        ids = self.get_ids() if ids is None else [ids]
+    def strategy_analysis(self, strategies, ids=None):
+        ids = self.get_ids() if ids is None else ids
 
         # Get distinct code sample ids
         code_sample_ids = CodeSmell.get_code_sample_ids(self.conn, ids)
@@ -77,6 +77,25 @@ class Analyzer:
         total_smells = sum(
             len(CodeSample.get_related_smells(self.conn, code_sample_id)) for code_sample_id in code_sample_ids)
         print(f'Number of smells being evaluated: {total_smells}')
+
+        for strategy, assistant_id in strategies.items():
+            print(f"Strategy: {strategy}")
+            self.openai_client.assistant_id = assistant_id
+            self.results_file = f'./data/results_{strategy}.json'
+            self.initialize_results()
+            self.analyze_code_samples(code_sample_ids, use_cached=True)
+            self.view_heatmaps(title=f'Results Heatmaps ({strategy.capitalize()})')
+            self.binary_evaluation()
+            self.ordinal_evaluation()
+
+
+    def analyze_code_samples(self, code_sample_ids, use_cached=False):
+        if use_cached:
+            if os.path.exists(self.results_file):
+                self.load_results()
+                return
+            else:
+                print(f"Cached file {self.results_file} not found. Generating new results.")
 
         for code_sample_id in code_sample_ids:
             self.process_code_sample(code_sample_id)
@@ -95,14 +114,14 @@ class Analyzer:
         smells = CodeSample.get_related_smells(self.conn, code_sample_id)
         sample = CodeSample.get_by_id(self.conn, code_sample_id)
         response = self.openai_client.get_response(sample.code_segment)
-        print(f'Code sample id: {code_sample_id}')
+        # print(f'Code sample id: {code_sample_id}')
         for smell in smells:
             self.update_results(smell, response)
-        print(f'Response: {response}')
+        # print(f'Response: {response}')
 
     def update_results(self, smell, response):
         self.results[smell.smell][smell.severity]['total'] += 1
-        print(f'Smell: {smell}')
+        # print(f'Smell: {smell}')
         smell_is_present = False
         for given_smell in response['smells']:
             if smell.get_name() == given_smell['name'] or (
@@ -240,7 +259,7 @@ class Analyzer:
 
         return kappa
 
-    def view_heatmaps(self):
+    def view_heatmaps(self, title='Results Heatmaps'):
         # Create a grid for all heatmaps in a 2x2 layout
         rows = (len(self.results) + 1) // 2  # Calculate required rows for a 2x2 grid
         fig, axes = plt.subplots(rows, 2, figsize=(16, 6 * rows))
@@ -306,7 +325,7 @@ class Analyzer:
                     ax.text(j + 0.5, i + 0.5, annotations[i][j],
                             ha="center", va="center", color="black")
 
-            ax.set_title(f'{smell.capitalize()} Results Heatmap')
+            ax.set_title(f'{smell.capitalize()}')
             ax.set_ylabel('Actual Severity')
             ax.set_xlabel('Guessed Severity')
 
@@ -324,5 +343,8 @@ class Analyzer:
         for ax in axes[len(self.results):]:
             fig.delaxes(ax)
 
-        plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make space for the colorbars
+
+        plt.tight_layout(rect=[0, 0, 0.85, 0.95])  # Adjust layout to make space
+        plt.subplots_adjust(top=0.94)  # Add more whitespace on top
+        plt.suptitle(title, fontsize=16, fontweight='bold')  # Move title higher
         plt.show()
