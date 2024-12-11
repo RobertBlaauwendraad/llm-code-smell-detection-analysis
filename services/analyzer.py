@@ -51,6 +51,9 @@ class Analyzer:
             with open(self.results_file, "r") as file:
                 self.results = json.load(file)
             print(f"Results loaded from {self.results_file}")
+            print(
+                f'Number of smells being evaluated: {sum(sum(results['total'] for results in severity_results.values())
+                                                         for severity_results in self.results.values())}')
         else:
             print(f"Results file {self.results_file} not found. Starting fresh.")
             self.initialize_results()
@@ -191,18 +194,19 @@ class Analyzer:
 
     def weighted_kappa(self, severity_results, weights='linear'):
         """
-        Calculate Weighted Kappa for a specific smell.
+        Calculate Weighted Kappa for a specific smell, excluding 'none' cases.
 
         :param severity_results: A dictionary with 'total' and 'guessed' for each severity.
         :param weights: 'linear' or 'quadratic' to determine weight matrix type.
         :return: Weighted Kappa score.
         """
-        n = len(SEVERITIES)
+        n = len(SEVERITIES) - 1  # Exclude 'none'
+        valid_severities = SEVERITIES[1:]  # Skip 'none'
 
         # Observed matrix
         observed = np.zeros((n, n))
-        for i, actual in enumerate(SEVERITIES):
-            for j, guessed in enumerate(SEVERITIES):
+        for i, actual in enumerate(valid_severities):
+            for j, guessed in enumerate(valid_severities):
                 observed[i, j] = severity_results[actual]['guessed'][guessed]
 
         # Normalize observed matrix
@@ -249,26 +253,41 @@ class Analyzer:
         vmin = float('inf')
         vmax = float('-inf')
 
-        # Find the min and max value across all data for shared heatmap scales
+        # Find the min and max value for non-diagonal (incorrect) data
         for smell, severity_results in self.results.items():
             for severity, results in severity_results.items():
-                vmin = min(vmin, *results['guessed'].values())
-                vmax = max(vmax, *results['guessed'].values())
+                for guessed_severity, value in results['guessed'].items():
+                    if severity != guessed_severity:
+                        vmin = min(vmin, value)
+                        vmax = max(vmax, value)
 
         # Define shared color maps and normalization for the entire figure
         cmap_diag = sns.light_palette("green", as_cmap=True)
         cmap_non_diag = sns.light_palette("red", as_cmap=True)
-        norm_diag = plt.Normalize(vmin, vmax)
+        norm_diag = plt.Normalize(0, 1)  # Percentage range for correct answers
         norm_non_diag = plt.Normalize(vmin, vmax)
 
         for ax, (smell, severity_results) in zip(axes, self.results.items()):
             data = []
+            annotations = []  # Store annotations for each cell
             for severity, results in severity_results.items():
-                data.append(
-                    [severity, results['guessed']['none'], results['guessed']['minor'], results['guessed']['major'],
-                     results['guessed']['critical']])
-            df = pd.DataFrame(data, columns=['Severity', 'None', 'Minor', 'Major', 'Critical'])
-            df.set_index('Severity', inplace=True)
+                row = [severity]
+                row_annotations = [""]
+                for guessed_severity in ['none', 'minor', 'major', 'critical']:
+                    guessed = results['guessed'][guessed_severity]
+                    if severity == guessed_severity:
+                        total = results['total']
+                        percentage = guessed / total if total > 0 else 0
+                        row.append(percentage)  # Use percentage for diagonal cells
+                        row_annotations.append(f"{guessed}/{total}" if total > 0 else "0/0")  # Correct/total
+                    else:
+                        row.append(guessed)  # Use absolute values for non-diagonal
+                        row_annotations.append(str(guessed))
+                data.append(row[1:])  # Skip severity name for heatmap data
+                annotations.append(row_annotations[1:])  # Skip severity name for annotations
+
+            df = pd.DataFrame(data, columns=['None', 'Minor', 'Major', 'Critical'])
+            df.index = ['None', 'Minor', 'Major', 'Critical']
 
             mask = pd.DataFrame(False, index=df.index, columns=df.columns)
             for i, col in enumerate(df.columns):
@@ -276,10 +295,16 @@ class Analyzer:
                     mask.iloc[i, i] = True  # Diagonal boxes
 
             # Plot with shared scales
-            sns.heatmap(df, annot=True, cmap=cmap_diag, fmt='d', linewidths=.5, ax=ax, mask=~mask,
-                        cbar=False, vmin=vmin, vmax=vmax, norm=norm_diag)
-            sns.heatmap(df, annot=True, cmap=cmap_non_diag, fmt='d', linewidths=.5, ax=ax, mask=mask,
+            sns.heatmap(df, annot=False, cmap=cmap_diag, fmt='d', linewidths=.5, ax=ax, mask=~mask,
+                        cbar=False, vmin=0, vmax=1, norm=norm_diag)  # Diagonal uses percentage normalization
+            sns.heatmap(df, annot=False, cmap=cmap_non_diag, fmt='d', linewidths=.5, ax=ax, mask=mask,
                         cbar=False, vmin=vmin, vmax=vmax, norm=norm_non_diag)
+
+            # Add annotations to the heatmap
+            for i in range(len(df.index)):
+                for j in range(len(df.columns)):
+                    ax.text(j + 0.5, i + 0.5, annotations[i][j],
+                            ha="center", va="center", color="black")
 
             ax.set_title(f'{smell.capitalize()} Results Heatmap')
             ax.set_ylabel('Actual Severity')
@@ -289,7 +314,7 @@ class Analyzer:
         cbar_ax = fig.add_axes([0.93, 0.15, 0.02, 0.7])
         sm = plt.cm.ScalarMappable(cmap=sns.light_palette("green", as_cmap=True), norm=norm_diag)
         sm_non_diag = plt.cm.ScalarMappable(cmap=sns.light_palette("red", as_cmap=True), norm=norm_non_diag)
-        fig.colorbar(sm, cax=cbar_ax, label="Correct Answers")
+        fig.colorbar(sm, cax=cbar_ax, label="Percentage Correct (Diagonal)")
 
         # Add label for incorrect answers
         cbar_ax_non_diag = fig.add_axes([0.88, 0.15, 0.02, 0.7])
