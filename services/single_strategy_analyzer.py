@@ -21,7 +21,6 @@ SEVERITIES = ['none', 'minor', 'major', 'critical']
 class SingleStrategyAnalyzer:
     def __init__(self, strategy_name, assistant_id, results_file):
         self.strategy_name = strategy_name
-        self.assistant_id = assistant_id
         self.results_file = results_file
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient(assistant_id)
@@ -49,7 +48,7 @@ class SingleStrategyAnalyzer:
             print(f"Results file {self.results_file} not found. Starting fresh.")
             self.initialize_results()
 
-    def analyze_code_samples(self, code_sample_ids, use_cached=False):
+    def analyze_code_samples(self, sample_ids, use_cached=False):
         if use_cached:
             if os.path.exists(self.results_file):
                 self.load_results()
@@ -57,16 +56,16 @@ class SingleStrategyAnalyzer:
             else:
                 print(f"Cached file {self.results_file} not found. Generating new results.")
 
-        for code_sample_id in code_sample_ids:
-            self.process_code_sample(code_sample_id)
+        for sample_id in sample_ids:
+            self.process_code_sample(sample_id)
 
         self.save_results()
 
-    def process_code_sample(self, code_sample_id):
-        smells = CodeSample.get_related_smells(self.conn, code_sample_id)
-        sample = CodeSample.get_by_id(self.conn, code_sample_id)
+    def process_code_sample(self, sample_id):
+        related_smells = CodeSample.get_related_smells(self.conn, sample_id)
+        sample = CodeSample.get_by_id(self.conn, sample_id)
         response = self.openai_client.get_response(sample.code_segment)
-        for smell in smells:
+        for smell in related_smells:
             self.update_results(smell, response)
 
     def update_results(self, smell, response):
