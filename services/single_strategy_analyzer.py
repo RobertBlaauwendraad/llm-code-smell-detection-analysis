@@ -10,34 +10,22 @@ import warnings
 
 from config.config import Config
 from data.code_sample import CodeSample
-from data.code_smell import CodeSmell
 from services.openai_client import OpenAIClient
 
 warnings.filterwarnings("ignore", message=".*tight_layout.*")
-
-# SMELL_AMOUNTS = {
-#     'blob': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
-#     'data class': {'none': 29, 'minor': 5, 'major': 4, 'critical': 2},
-#     'long method': {'none': 30, 'minor': 5, 'major': 3, 'critical': 2},
-#     'feature envy': {'none': 34, 'minor': 3, 'major': 2, 'critical': 1}
-# }
-
-SMELL_AMOUNTS = {
-    'blob': {'none': 15, 'minor': 2, 'major': 2, 'critical': 1},
-    'data class': {'none': 14, 'minor': 3, 'major': 2, 'critical': 1},
-    'long method': {'none': 15, 'minor': 2, 'major': 2, 'critical': 1},
-    'feature envy': {'none': 17, 'minor': 1, 'major': 1, 'critical': 1}
-}
 
 SMELLS = ['blob', 'data class', 'long method', 'feature envy']
 SEVERITIES = ['none', 'minor', 'major', 'critical']
 
 
-class Analyzer:
-    def __init__(self):
+class SingleStrategyAnalyzer:
+    def __init__(self, strategy_name, assistant_id, results_file):
+        self.strategy_name = strategy_name
+        self.assistant_id = assistant_id
+        self.results_file = results_file
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient()
-        self.results_file = Config.RESULTS_FILE
+        self.openai_client.assistant_id = assistant_id
         self.results = {}
         self.initialize_results()
 
@@ -58,36 +46,9 @@ class Analyzer:
             with open(self.results_file, "r") as file:
                 self.results = json.load(file)
             print(f"Results loaded from {self.results_file}")
-            print(
-                f'Number of smells being evaluated: {sum(sum(results['total'] for results in severity_results.values())
-                                                         for severity_results in self.results.values())}')
         else:
             print(f"Results file {self.results_file} not found. Starting fresh.")
             self.initialize_results()
-
-    def strategy_analysis(self, strategies, ids=None):
-        ids = self.get_ids() if ids is None else ids
-
-        # Get distinct code sample ids
-        code_sample_ids = CodeSmell.get_code_sample_ids(self.conn, ids)
-        print(f'Code sample ids: {code_sample_ids}')
-        print(f'Number of code samples: {len(code_sample_ids)}')
-
-        # Calculate the total number of smells
-        total_smells = sum(
-            len(CodeSample.get_related_smells(self.conn, code_sample_id)) for code_sample_id in code_sample_ids)
-        print(f'Number of smells being evaluated: {total_smells}')
-
-        for strategy, assistant_id in strategies.items():
-            print(f"Strategy: {strategy}")
-            self.openai_client.assistant_id = assistant_id
-            self.results_file = f'./data/results_{strategy}.json'
-            self.initialize_results()
-            self.analyze_code_samples(code_sample_ids, use_cached=True)
-            self.view_heatmaps(title=f'Results Heatmaps ({strategy.capitalize()})')
-            self.binary_evaluation()
-            self.ordinal_evaluation()
-
 
     def analyze_code_samples(self, code_sample_ids, use_cached=False):
         if use_cached:
@@ -102,26 +63,15 @@ class Analyzer:
 
         self.save_results()
 
-    def get_ids(self):
-        ids = []
-        for smell, severity_amounts in SMELL_AMOUNTS.items():
-            for severity, amount in severity_amounts.items():
-                ids.extend(CodeSmell.get_ids(self.conn, smell, severity, amount))
-        return ids
-
     def process_code_sample(self, code_sample_id):
-        # Get all related smells to the code sample
         smells = CodeSample.get_related_smells(self.conn, code_sample_id)
         sample = CodeSample.get_by_id(self.conn, code_sample_id)
         response = self.openai_client.get_response(sample.code_segment)
-        # print(f'Code sample id: {code_sample_id}')
         for smell in smells:
             self.update_results(smell, response)
-        # print(f'Response: {response}')
 
     def update_results(self, smell, response):
         self.results[smell.smell][smell.severity]['total'] += 1
-        # print(f'Smell: {smell}')
         smell_is_present = False
         for given_smell in response['smells']:
             if smell.get_name() == given_smell['name'] or (
@@ -342,7 +292,6 @@ class Analyzer:
         # Remove unused subplots if necessary
         for ax in axes[len(self.results):]:
             fig.delaxes(ax)
-
 
         plt.tight_layout(rect=[0, 0, 0.85, 0.95])  # Adjust layout to make space
         plt.subplots_adjust(top=0.94)  # Add more whitespace on top
