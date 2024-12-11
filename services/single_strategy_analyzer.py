@@ -24,17 +24,16 @@ class SingleStrategyAnalyzer:
         self.assistant_id = assistant_id
         self.results_file = results_file
         self.conn = sqlite3.connect(Config.DB_PATH)
-        self.openai_client = OpenAIClient()
-        self.openai_client.assistant_id = assistant_id
-        self.results = {}
-        self.initialize_results()
+        self.openai_client = OpenAIClient(assistant_id)
+        self.results = self.initialize_results()
 
-    def initialize_results(self):
-        for smell in SMELLS:
-            self.results[smell] = {}
-            for severity in SEVERITIES:
-                self.results[smell][severity] = {'total': 0,
-                                                 'guessed': {'none': 0, 'minor': 0, 'major': 0, 'critical': 0}}
+    @staticmethod
+    def initialize_results():
+        return {
+            smell: {severity: {'total': 0, 'guessed': {sev: 0 for sev in SEVERITIES}}
+                    for severity in SEVERITIES}
+            for smell in SMELLS
+        }
 
     def save_results(self):
         with open(self.results_file, "w") as file:
