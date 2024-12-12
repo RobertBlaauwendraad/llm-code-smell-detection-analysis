@@ -25,6 +25,7 @@ class SingleStrategyAnalyzer:
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient(assistant_id)
         self.results = self.initialize_results()
+        self.evaluated_smells = []
 
     @staticmethod
     def initialize_results():
@@ -59,17 +60,23 @@ class SingleStrategyAnalyzer:
         for sample_id in sample_ids:
             self.process_code_sample(sample_id)
 
+        print(f'Evaluated smells: {self.evaluated_smells}')
+        print (f'Number of evaluated smells: {len(self.evaluated_smells)}')
         self.save_results()
 
     def process_code_sample(self, sample_id):
         related_smells = CodeSample.get_related_smells(self.conn, sample_id)
         sample = CodeSample.get_by_id(self.conn, sample_id)
         response = self.openai_client.get_response(sample.code_segment)
+        print(f'Code sample id: {sample_id}')
         for smell in related_smells:
+            self.evaluated_smells.append(smell.id)
             self.update_results(smell, response)
+        print(f'Response: {response}')
 
     def update_results(self, smell, response):
         self.results[smell.smell][smell.severity]['total'] += 1
+        print(f'Smell: {smell}')
         smell_is_present = False
         for given_smell in response['smells']:
             if smell.get_name() == given_smell['name'] or (

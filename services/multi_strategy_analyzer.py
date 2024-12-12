@@ -18,3 +18,4 @@ class MultiStrategyAnalyzer:
             self.results[strategy_name] = analyzer.results
             analyzer.binary_evaluation()
             analyzer.ordinal_evaluation()
+            analyzer.view_heatmaps()

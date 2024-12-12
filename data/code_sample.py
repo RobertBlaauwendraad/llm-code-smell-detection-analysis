@@ -21,8 +21,9 @@ class CodeSample:
     @staticmethod
     def get_related_smells(conn, sample_id):
         cursor = conn.cursor()
+        # Last 5115 smells are crosschecked
         cursor.execute('''
-            SELECT * FROM CodeSmell WHERE code_sample_id = ?
+            SELECT * FROM CodeSmell WHERE code_sample_id = ? AND id <= 10224
         ''', (sample_id,))
         rows = cursor.fetchall()
         smells = []
