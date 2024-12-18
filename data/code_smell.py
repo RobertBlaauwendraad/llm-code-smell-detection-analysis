@@ -31,12 +31,20 @@ class CodeSmell:
             return self.code_name.split('.')[-1].split(' ')[0]
 
     @staticmethod
-    def get_ids(conn, smell, severity, amount, min_id=None):
-        if min_id is None: min_id = 0
+    def get_ids(conn, smell, severity, amount, exclude_ids=None):
         cursor = conn.cursor()
-        cursor.execute('''
-            SELECT CodeSmell.id FROM CodeSmell INNER JOIN CodeSample on CodeSample.id = CodeSmell.code_sample_id WHERE smell = ? AND severity = ? AND CodeSmell.id >= ? AND CodeSmell.id <= 10224 and length(code_segment) < ? LIMIT ?;
-        ''', (smell, severity, min_id, MAX_CODE_SEGMENT_LENGTH, amount))
+        exclude_clause = ''
+        if exclude_ids:
+            exclude_clause = 'AND CodeSmell.id NOT IN ({})'.format(','.join('?' * len(exclude_ids)))
+        query = f'''
+        SELECT CodeSmell.id
+        FROM CodeSmell
+        INNER JOIN CodeSample on CodeSample.id = CodeSmell.code_sample_id
+        WHERE smell = ? AND severity = ? AND length(code_segment) < ? AND CodeSmell.id <= 10224 {exclude_clause}
+        LIMIT ?
+        '''
+        params = [smell, severity, MAX_CODE_SEGMENT_LENGTH] + (exclude_ids if exclude_ids else []) + [amount]
+        cursor.execute(query, params)
         rows = cursor.fetchall()
         return [row[0] for row in rows]
 

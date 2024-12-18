@@ -16,5 +16,5 @@ class Config:
         'few-shot': 'asst_vDqW8qhUVOICnIojIgmqm2p2',
         'chain-of-thought': 'asst_XorQC7WYAv9nasySxftwVRO3',
         'role_prompting': 'asst_dgboDtdnug9J0MOk4IoSuUJ6',
-        'combined_prompt': 'asst_4LqtQpbTLilEENlisf4kbEcy'
+        # 'combined_prompt': 'asst_4LqtQpbTLilEENlisf4kbEcy'
     }

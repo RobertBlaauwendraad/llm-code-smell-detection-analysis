@@ -19,12 +19,11 @@ class CodeSample:
         return cursor.lastrowid
 
     @staticmethod
-    def get_related_smells(conn, sample_id, min_id = None):
-        if min_id is None: min_id = 0
+    def get_related_smells(conn, sample_id):
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT * FROM CodeSmell WHERE code_sample_id = ? AND id >= ? AND id <= 10224
-        ''', (sample_id, min_id))
+            SELECT * FROM CodeSmell WHERE code_sample_id = ? AND id <= 10224
+        ''', (sample_id,))
         rows = cursor.fetchall()
         smells = []
         for row in rows:
