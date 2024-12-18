@@ -15,5 +15,6 @@ class Config:
         'zero-shot': 'asst_8TPp3H5Gtjh8lVPZDE6T3QUc',
         'few-shot': 'asst_vDqW8qhUVOICnIojIgmqm2p2',
         'chain-of-thought': 'asst_XorQC7WYAv9nasySxftwVRO3',
-        'role_prompting': 'asst_dgboDtdnug9J0MOk4IoSuUJ6'
+        'role_prompting': 'asst_dgboDtdnug9J0MOk4IoSuUJ6',
+        'combined_prompt': 'asst_4LqtQpbTLilEENlisf4kbEcy'
     }

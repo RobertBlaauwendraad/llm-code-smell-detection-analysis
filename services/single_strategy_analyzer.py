@@ -19,9 +19,10 @@ SEVERITIES = ['none', 'minor', 'major', 'critical']
 
 
 class SingleStrategyAnalyzer:
-    def __init__(self, strategy_name, assistant_id, results_file):
+    def __init__(self, strategy_name, assistant_id, results_file, min_id=None):
         self.strategy_name = strategy_name
         self.results_file = results_file
+        self.min_id = min_id
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient(assistant_id)
         self.results = self.initialize_results()
@@ -62,10 +63,11 @@ class SingleStrategyAnalyzer:
 
         print(f'Evaluated smells: {self.evaluated_smells}')
         print (f'Number of evaluated smells: {len(self.evaluated_smells)}')
-        self.save_results()
+        if  use_cached:
+            self.save_results()
 
     def process_code_sample(self, sample_id):
-        related_smells = CodeSample.get_related_smells(self.conn, sample_id)
+        related_smells = CodeSample.get_related_smells(self.conn, sample_id, self.min_id)
         sample = CodeSample.get_by_id(self.conn, sample_id)
         response = self.openai_client.get_response(sample.code_segment)
         print(f'Code sample id: {sample_id}')

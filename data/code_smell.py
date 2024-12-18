@@ -1,3 +1,5 @@
+MAX_CODE_SEGMENT_LENGTH = 256000
+
 class CodeSmell:
     def __init__(self, smell_id, code_sample_id, smell, severity, scope, code_name, start_line, end_line, link):
         self.id = smell_id
@@ -29,11 +31,12 @@ class CodeSmell:
             return self.code_name.split('.')[-1].split(' ')[0]
 
     @staticmethod
-    def get_ids(conn, smell, severity, amount):
+    def get_ids(conn, smell, severity, amount, min_id=None):
+        if min_id is None: min_id = 0
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT id FROM CodeSmell WHERE smell = ? AND severity = ? LIMIT ?
-        ''', (smell, severity, amount))
+            SELECT CodeSmell.id FROM CodeSmell INNER JOIN CodeSample on CodeSample.id = CodeSmell.code_sample_id WHERE smell = ? AND severity = ? AND CodeSmell.id >= ? AND CodeSmell.id <= 10224 and length(code_segment) < ? LIMIT ?;
+        ''', (smell, severity, min_id, MAX_CODE_SEGMENT_LENGTH, amount))
         rows = cursor.fetchall()
         return [row[0] for row in rows]
 
