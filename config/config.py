@@ -9,7 +9,7 @@ class Config:
     OPENAI_PROJECT = os.environ.get('OPENAI_PROJECT')
     GITHUB_TOKEN = os.environ.get('GITHUB_TOKEN')
     ASSISTANT_ID = 'asst_8TPp3H5Gtjh8lVPZDE6T3QUc'
-    DB_PATH = './data/code_smell_detection_analysis.db'
+    DB_PATH = './data/llm_code_smell_detection_analysis.db'
     DATASET_PATH = './data/MLCQCodeSmellSamples.csv'
     PROMPT_STRATEGIES = {
         'zero-shot': 'asst_8TPp3H5Gtjh8lVPZDE6T3QUc',
