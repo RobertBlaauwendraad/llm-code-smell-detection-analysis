@@ -32,7 +32,7 @@ The tool uses OpenAI's API to analyze code samples and provides metrics to evalu
 
 ### Prerequisites
 
-- Python 3.14 or higher
+- Python 3.12 or higher
 - OpenAI API key
 - GitHub token (for fetching code samples)
 
