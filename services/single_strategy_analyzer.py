@@ -1,6 +1,7 @@
 import json
 import os
 import sqlite3
+from tokenize import String
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,10 +23,12 @@ class SingleStrategyAnalyzer:
     def __init__(self, strategy_name, assistant_id, results_file):
         self.strategy_name = strategy_name
         self.results_file = results_file
+        self.cache_file = f"{results_file}.cache"
         self.conn = sqlite3.connect(Config.DB_PATH)
         self.openai_client = OpenAIClient(assistant_id)
         self.results = self.initialize_results()
         self.evaluated_smells = []
+        self.cache = self.load_cache()
 
     @staticmethod
     def initialize_results():
@@ -65,15 +68,31 @@ class SingleStrategyAnalyzer:
         if  use_cached:
             self.save_results()
 
+    def load_cache(self):
+        if os.path.exists(self.cache_file):
+            with open(self.cache_file, "r") as file:
+                return json.load(file)
+        return {}
+
+    def save_cache(self):
+        with open(self.cache_file, "w") as file:
+            json.dump(self.cache, file)
+
     def process_code_sample(self, sample_id):
         related_smells = CodeSample.get_related_smells(self.conn, sample_id)
         sample = CodeSample.get_by_id(self.conn, sample_id)
-        response = self.openai_client.get_response(sample.code_segment)
-        print(f'Code sample id: {sample_id}')
+        print(f"Code sample id: {sample_id}")
+        if str(sample_id) in self.cache:
+            response = self.cache[str(sample_id)]
+            print(f"Cache hit for code sample id: {sample_id}")
+        else:
+            response = self.openai_client.get_response(sample.code_segment)
+            self.cache[sample_id] = response
+            self.save_cache()
         for smell in related_smells:
             self.evaluated_smells.append(smell.id)
             self.update_results(smell, response)
-        print(f'Response: {response}')
+        print(f"Response: {response}")
 
     def update_results(self, smell, response):
         self.results[smell.smell][smell.severity]['total'] += 1
